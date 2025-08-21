@@ -1,63 +1,54 @@
-version: '3.8'
 
 services:
-  frontend:
-    build: ./frontend
-    ports:
-      - "4200:80"
-    depends_on:
-      - backend
-
-  backend:
-    build: ./backend
-    ports:
-      - "3000:3000"
-    environment:
-      INFLUX_URL: http://influxdb:8086
-      INFLUX_TOKEN: your_token
-      INFLUX_ORG: your_org
-      INFLUX_BUCKET: your_bucket
-      MYSQL_HOST: mariadb
-      MYSQL_USER: youruser
-      MYSQL_PASSWORD: yourpassword
-      MYSQL_DATABASE: userdb
-    depends_on:
-      - influxdb
-      - mariadb
-
   influxdb:
-    image: influxdb:2.7
+    image: influxdb:${INFLUXDB_VERSION}
+    container_name: influxdbCS
     ports:
-      - "8086:8086"
+      - "${INFLUXDB_PORT}:8086"
     volumes:
-      - influxdb:/var/lib/influxdb2
+      - influxdb_data:/var/lib/influxdb2
     environment:
-      DOCKER_INFLUXDB_INIT_MODE: setup
-      DOCKER_INFLUXDB_INIT_USERNAME: admin
-      DOCKER_INFLUXDB_INIT_PASSWORD: adminpassword
-      DOCKER_INFLUXDB_INIT_ORG: your_org
-      DOCKER_INFLUXDB_INIT_BUCKET: your_bucket
-      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: your_token
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_USER}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET}
 
   mariadb:
-    image: mariadb:10.11
+    image: mariadb:${MARIADB_VERSION}
+    container_name: mariadb
     restart: always
+    ports:
+      - "${MARIADB_PORT}:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_DATABASE: userdb
-      MYSQL_USER: youruser
-      MYSQL_PASSWORD: yourpassword
+      - MYSQL_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MARIADB_DATABASE}
+      - MYSQL_USER=${MARIADB_USER}
+      - MYSQL_PASSWORD=${MARIADB_PASSWORD}
     volumes:
-      - mariadb:/var/lib/mysql
-    ports:
-      - "3306:3306"
+      - mariadb_data:/var/lib/mysql
 
-  adminer:
-    image: adminer
-    restart: always
+  angular:
+    build:
+      context: ./angular
+      dockerfile: Dockerfile
+    container_name: angular
+    working_dir: /app
+    volumes:
+      - ./angular:/app
+    command: ["npm", "run", "build"]
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
     ports:
-      - "8080:8080"
+      - "${NGINX_PORT}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./angular/dist:/usr/share/nginx/html:ro
+    depends_on:
+      - angular
 
 volumes:
-  influxdb:
-  mariadb:
+  influxdb_data:
+  mariadb_data:
